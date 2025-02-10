@@ -3,6 +3,7 @@ package com.example.interviewprep.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
@@ -17,23 +18,28 @@ public class OpenAIService {
 
     @Value("${openai.api.url}")
     private String openaiApiUrl;
-
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
 
-    public OpenAIService(WebClient webClient, ObjectMapper objectMapper) {
-        this.webClient = webClient;
+    @Autowired
+    public OpenAIService(WebClient.Builder webClientBuilder, ObjectMapper objectMapper) {
+        this.webClient = webClientBuilder.baseUrl(openaiApiUrl).build();
         this.objectMapper = objectMapper;
     }
 
     public Mono<String> generateQuestionReactive(String prompt) {
-        ObjectNode requestBody = createRequestBody(prompt);
+        // Define the request body
+        String requestBody = "{\n" +
+                "  \"model\": \"gpt-4o-mini\",\n" +
+                "  \"messages\": [{\"role\": \"user\", \"content\": \"" + prompt + "\"}],\n" +
+                "  \"temperature\": 0.7\n" +
+                "}";
 
         return webClient.post()
-                .uri(openaiApiUrl)
+                .uri("/chat/completions")
                 .header("Authorization", "Bearer " + openaiApiKey)
                 .header("Content-Type", "application/json")
-                .bodyValue(requestBody.toString())
+                .bodyValue(requestBody)
                 .retrieve()
                 .onStatus(
                         HttpStatusCode::isError, // Handle error status directly with lambda
@@ -44,12 +50,14 @@ public class OpenAIService {
                 .map(this::parseResponse);
     }
 
+/*
     private ObjectNode createRequestBody(String prompt) {
         ObjectNode requestBody = objectMapper.createObjectNode();
         requestBody.put("prompt", prompt);
         requestBody.put("max_tokens", 150);
         return requestBody;
     }
+*/
 
     private String parseResponse(String responseBody) {
         try {
